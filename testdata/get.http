@@ -1,0 +1,3 @@
+### Method + URL
+# @name get
+GET https://httpbin.org/get

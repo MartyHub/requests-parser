@@ -1,0 +1,7 @@
+# @name post template
+POST https://{{.Host}}/post
+Content-Type: application/json
+
+{
+  "{{.Key}}": {{.Value}}
+}

@@ -1,0 +1,5 @@
+# @name post from file
+POST https://httpbin.org/post
+Content-Type: application/json
+
+< post.json
