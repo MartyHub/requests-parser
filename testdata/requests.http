@@ -1,0 +1,37 @@
+### Just an URL
+https://httpbin.org/get
+
+### Method + URL
+# @name get
+GET https://httpbin.org/get
+
+### Method + URL + Proto
+# @name get with proto
+GET https://httpbin.org/get HTTP/1.1
+
+### @name get with headers
+https://httpbin.org/get
+Accept: application/json
+Accept-Encoding: gzip, deflate, compress, br, *
+
+### @name post
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "key": "value"
+}
+
+### @name post from file
+POST https://httpbin.org/post
+Content-Type: application/json
+
+< post.json
+
+### @name post template
+POST https://{{.Host}}/post
+Content-Type: application/json
+
+{
+  "{{.Key}}": {{.Value}}
+}

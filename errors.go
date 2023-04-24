@@ -15,15 +15,11 @@ func (e TemplateError) Error() string {
 }
 
 type InvalidRequestFileError struct {
-	err  error
-	file string
+	msg string
 }
 
 func (e InvalidRequestFileError) Error() string {
-	return fmt.Sprintf("failed to find any request in %q: %v",
-		e.file,
-		e.err,
-	)
+	return e.msg
 }
 
 type InvalidRequestLineError struct {
@@ -32,7 +28,7 @@ type InvalidRequestLineError struct {
 }
 
 func (e InvalidRequestLineError) Error() string {
-	return fmt.Sprintf("invalid request line in %q: expected %q, got %q",
+	return fmt.Sprintf("invalid request line in file %q: expected %q, got %q",
 		e.file,
 		"URL, METHOD URL or METHOD URL PROTO",
 		e.line,
@@ -46,7 +42,7 @@ type InvalidURLError struct {
 }
 
 func (e InvalidURLError) Error() string {
-	return fmt.Sprintf("failed to parse URL %q in %q: %v",
+	return fmt.Sprintf("failed to parse URL %q in file %q: %v",
 		e.url,
 		e.file,
 		e.err,
@@ -59,7 +55,7 @@ type InvalidHeaderError struct {
 }
 
 func (e InvalidHeaderError) Error() string {
-	return fmt.Sprintf("invalid header in %q: %v",
+	return fmt.Sprintf("invalid header in file %q: %v",
 		e.file,
 		e.err,
 	)
@@ -71,7 +67,7 @@ type BodyError struct {
 }
 
 func (e BodyError) Error() string {
-	return fmt.Sprintf("failed to parse body in %q: %v",
+	return fmt.Sprintf("failed to parse body in file %q: %v",
 		e.file,
 		e.err,
 	)

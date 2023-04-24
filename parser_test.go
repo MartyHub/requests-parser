@@ -128,7 +128,7 @@ func TestParser_Parse(t *testing.T) { //nolint:funlen
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := p.Parse(tt.fileName, tplData)
+			got, err := p.ParseSingle(tt.fileName, tplData)
 
 			require.NoError(t, err)
 
@@ -168,12 +168,12 @@ func TestParser_Parse_Error(t *testing.T) {
 		{
 			name:     "empty",
 			fileName: "empty.http",
-			wantErr:  `failed to find any request in "testdata/empty.http": EOF`,
+			wantErr:  `no request in file "testdata/empty.http"`,
 		},
 		{
 			name:     "invalid request line",
 			fileName: "invalid_request_line.http",
-			wantErr: `invalid request line in "testdata/invalid_request_line.http": ` +
+			wantErr: `invalid request line in file "testdata/invalid_request_line.http": ` +
 				`expected "URL, METHOD URL or METHOD URL PROTO", ` +
 				`got "GET https://httpbin.org/get HTTP/1.1 EXTRA"`,
 		},
@@ -185,5 +185,124 @@ func TestParser_Parse_Error(t *testing.T) {
 
 			assert.EqualError(t, err, tt.wantErr)
 		})
+	}
+}
+
+func TestParser_Parse_Multiple(t *testing.T) { //nolint:funlen
+	p := Parser{Path: "testdata/"}
+	tplData := struct {
+		Host  string
+		Key   string
+		Value int
+	}{
+		Host:  "httpbin.org",
+		Key:   "key",
+		Value: 42,
+	}
+
+	type want struct {
+		headers http.Header
+		method  string
+		proto   string
+		url     *url.URL
+		body    string
+	}
+
+	wants := []want{
+		{
+			headers: http.Header{},
+			method:  http.MethodGet,
+			url:     mustParse(t, "https://httpbin.org/get"),
+		},
+		{
+			headers: http.Header{},
+			method:  http.MethodGet,
+			url:     mustParse(t, "https://httpbin.org/get"),
+		},
+		{
+			headers: http.Header{},
+			method:  http.MethodGet,
+			proto:   "HTTP/1.1",
+			url:     mustParse(t, "https://httpbin.org/get"),
+		},
+		{
+			headers: http.Header{
+				"Accept":          {"application/json"},
+				"Accept-Encoding": {"gzip, deflate, compress, br, *"},
+			},
+			method: http.MethodGet,
+			url:    mustParse(t, "https://httpbin.org/get"),
+		},
+		{
+			headers: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			method: http.MethodPost,
+			url:    mustParse(t, "https://httpbin.org/post"),
+			body: strings.Join(
+				[]string{
+					"{",
+					`  "key": "value"`,
+					"}",
+					"",
+					"",
+				},
+				"\r\n",
+			),
+		},
+		{
+			headers: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			method: http.MethodPost,
+			url:    mustParse(t, "https://httpbin.org/post"),
+			body: strings.Join(
+				[]string{
+					"{",
+					`  "key": 42`,
+					"}",
+					"\r\n\r\n",
+				},
+				"\n",
+			),
+		},
+		{
+			headers: map[string][]string{
+				"Content-Type": {"application/json"},
+			},
+			method: http.MethodPost,
+			url:    mustParse(t, "https://httpbin.org/post"),
+			body: strings.Join(
+				[]string{
+					"{",
+					`  "key": 42`,
+					"}",
+					"",
+				},
+				"\r\n",
+			),
+		},
+	}
+
+	reqs, err := p.Parse("requests.http", tplData)
+	require.NoError(t, err)
+	require.Len(t, reqs, len(wants))
+
+	for i, got := range reqs {
+		w := wants[i]
+
+		assert.Equal(t, w.headers, got.Header)
+		assert.Equal(t, w.method, got.Method)
+		assert.Equal(t, w.proto, got.Proto)
+		assert.Equal(t, w.url, got.URL)
+
+		if w.body == "" {
+			assert.Nil(t, got.Body)
+		} else {
+			body, err := io.ReadAll(got.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, w.body, string(body))
+		}
 	}
 }

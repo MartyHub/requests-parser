@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -26,14 +27,54 @@ type Parser struct {
 	Path    string
 }
 
-func (p Parser) Parse(fileName string, data any) (*http.Request, error) {
+func (p Parser) ParseSingle(fileName string, data any) (*http.Request, error) {
+	reqs, err := p.Parse(fileName, data)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(reqs) != 1 {
+		return nil, InvalidRequestFileError{
+			msg: fmt.Sprintf("expected only 1 request in file %q, got %d", p.file(fileName), len(reqs)),
+		}
+	}
+
+	return reqs[0], nil
+}
+
+func (p Parser) Parse(fileName string, data any) ([]*http.Request, error) {
 	buf, err := p.exec(fileName, data)
 	if err != nil {
 		return nil, err
 	}
 
+	var result []*http.Request
+
 	r := textproto.NewReader(bufio.NewReader(buf))
 
+	for {
+		req, err := p.doParse(fileName, data, r)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, req)
+	}
+
+	if len(result) == 0 {
+		return nil, InvalidRequestFileError{
+			msg: fmt.Sprintf("no request in file %q", p.file(fileName)),
+		}
+	}
+
+	return result, nil
+}
+
+func (p Parser) doParse(fileName string, data any, r *textproto.Reader) (*http.Request, error) {
 	req, err := p.parseRequest(fileName, r)
 	if err != nil {
 		return nil, err
@@ -86,13 +127,10 @@ func (p Parser) parseRequest(fileName string, r *textproto.Reader) (*http.Reques
 	for {
 		line, err := r.ReadContinuedLine()
 		if err != nil {
-			return nil, InvalidRequestFileError{
-				err:  err,
-				file: p.file(fileName),
-			}
+			return nil, err //nolint:wrapcheck
 		}
 
-		if isComment(line) {
+		if line == "" || isComment(line) {
 			continue
 		}
 
@@ -156,6 +194,10 @@ func (p Parser) parseBody(fileName string, r *textproto.Reader, req *http.Reques
 				err:  err,
 				file: p.file(fileName),
 			}
+		}
+
+		if strings.HasPrefix(line, "###") {
+			break
 		}
 
 		if strings.HasPrefix(line, "<") {
